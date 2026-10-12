@@ -1,0 +1,1586 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#100b08" />
+    <title>NOCTURNE — Music Player</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #100b08;
+        --panel: rgba(26, 21, 19, 0.76);
+        --muted: #9a8f88;
+        --line: rgba(255, 255, 255, 0.09);
+        --accent: #ff9a52;
+        --accent-bright: #ffc078;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: radial-gradient(
+          ellipse at 52% 40%,
+          #382013 0%,
+          #19110d 36%,
+          var(--bg) 76%
+        );
+        color: #fff8f1;
+        font-family: Manrope, system-ui, sans-serif;
+        overflow-x: hidden;
+      }
+      body:before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.13;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.92' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.2'/%3E%3C/svg%3E");
+      }
+      button {
+        color: inherit;
+        font: inherit;
+        border: 0;
+        cursor: pointer;
+      }
+      .app {
+        width: min(1260px, calc(100% - 48px));
+        margin: auto;
+        padding: 28px 0 130px;
+        position: relative;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 44px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        font-size: 13px;
+        letter-spacing: 0.23em;
+        font-weight: 800;
+      }
+      .brand-mark {
+        width: 29px;
+        height: 29px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 10px;
+        display: grid;
+        place-items: center;
+        background: linear-gradient(145deg, #ffd08a, #f47b3a);
+        color: #291307;
+        box-shadow: 0 0 26px #ff9b5250;
+      }
+      .top-right {
+        color: var(--muted);
+        font:
+          11px "DM Mono",
+          monospace;
+        letter-spacing: 0.08em;
+        display: flex;
+        gap: 18px;
+        align-items: center;
+      }
+      .library-toggle {
+        padding: 10px 15px;
+        border: 1px solid #ffffff22;
+        border-radius: 999px;
+        background: #ffffff0a;
+        color: #ffe4ca;
+        font:
+          10px "DM Mono",
+          monospace;
+        letter-spacing: 0.09em;
+        backdrop-filter: blur(12px);
+        transition: 0.2s;
+      }
+      .library-toggle:hover {
+        border-color: #ffb46c80;
+        background: #ff9a5218;
+      }
+      .live {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        display: inline-block;
+        background: #7ee6bd;
+        box-shadow: 0 0 10px #7ee6bd;
+        margin-right: 8px;
+      }
+      main {
+        display: block;
+        margin-top: 36px;
+      }
+      .visual-column {
+        min-width: 0;
+        text-align: center;
+      }
+      .eyebrow {
+        color: #f2ad72;
+        font:
+          10px "DM Mono",
+          monospace;
+        letter-spacing: 0.23em;
+        text-transform: uppercase;
+      }
+      h1 {
+        font-size: clamp(34px, 5vw, 56px);
+        line-height: 1.08;
+        letter-spacing: -0.06em;
+        margin: 12px 0 0;
+        font-weight: 700;
+      }
+      h1 span {
+        color: #ffae68;
+        font-weight: 400;
+      }
+      .stage {
+        height: min(62vh, 590px);
+        min-height: 440px;
+        position: relative;
+        margin: 4px auto 0;
+        overflow: hidden;
+        border-radius: 34px;
+        perspective: 1300px;
+        isolation: isolate;
+      }
+      #viz {
+        width: 100%;
+        height: 100%;
+        display: block;
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        outline: none;
+      }
+      .stage:before {
+        content: "";
+        position: absolute;
+        inset: 8% 13%;
+        z-index: -1;
+        pointer-events: none;
+        background: radial-gradient(
+          ellipse,
+          #a83b7540 0%,
+          #5f204f2b 32%,
+          transparent 72%
+        );
+        filter: blur(22px);
+      }
+      .stage:after {
+        content: "";
+        pointer-events: none;
+        position: absolute;
+        inset: 0;
+        background:
+          linear-gradient(
+            90deg,
+            #120d0a 0%,
+            transparent 20%,
+            transparent 80%,
+            #120d0a 100%
+          ),
+          linear-gradient(
+            0deg,
+            #120d0a 0%,
+            transparent 24%,
+            transparent 88%,
+            #21140e 100%
+          );
+        opacity: 0.42;
+        z-index: 1;
+      }
+      .carousel {
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        transform-style: preserve-3d;
+      }
+      .coverflow-card {
+        --hue: 25;
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 292px;
+        height: 416px;
+        margin: -208px 0 0 -146px;
+        padding: 10px;
+        border-radius: 25px;
+        border: 1px solid #ffffff56;
+        background: linear-gradient(
+          145deg,
+          #ffffff20,
+          #ffffff09 58%,
+          #ffffff14
+        );
+        box-shadow:
+          0 25px 90px #0008,
+          inset 0 1px #ffffff55;
+        backdrop-filter: blur(18px);
+        transform-style: preserve-3d;
+        transition:
+          transform 0.65s cubic-bezier(0.2, 0.8, 0.2, 1),
+          opacity 0.55s,
+          filter 0.55s;
+        overflow: hidden;
+        cursor: pointer;
+        text-align: left;
+      }
+      .coverflow-card.current {
+        z-index: 4;
+        transform: translate3d(0, 0, 90px) scale(1);
+        opacity: 1;
+      }
+      .coverflow-card.prev {
+        z-index: 3;
+        transform: translate3d(-226px, 12px, -90px) rotateY(25deg) scale(0.84);
+        opacity: 0.75;
+        filter: saturate(0.82);
+      }
+      .coverflow-card.next {
+        z-index: 3;
+        transform: translate3d(226px, 12px, -90px) rotateY(-25deg) scale(0.84);
+        opacity: 0.75;
+        filter: saturate(0.82);
+      }
+      .coverflow-card.far-prev {
+        z-index: 2;
+        transform: translate3d(-390px, 24px, -230px) rotateY(32deg) scale(0.67);
+        opacity: 0.38;
+        filter: blur(0.4px) saturate(0.65);
+      }
+      .coverflow-card.far-next {
+        z-index: 2;
+        transform: translate3d(390px, 24px, -230px) rotateY(-32deg) scale(0.67);
+        opacity: 0.38;
+        filter: blur(0.4px) saturate(0.65);
+      }
+      .poster {
+        height: 285px;
+        position: relative;
+        overflow: hidden;
+        border-radius: 17px;
+        background: linear-gradient(
+          145deg,
+          hsl(var(--hue) 66% 24%),
+          hsl(calc(var(--hue) + 18) 75% 47%) 52%,
+          hsl(calc(var(--hue) + 38) 84% 68%)
+        );
+        box-shadow: inset 0 0 60px #200b1e70;
+      }
+      .poster:before {
+        content: "";
+        position: absolute;
+        inset: -15%;
+        background:
+          radial-gradient(ellipse at 63% 31%, #fff7 0, transparent 25%),
+          radial-gradient(
+            ellipse at 25% 84%,
+            hsl(calc(var(--hue) + 46) 90% 58% / 0.8) 0,
+            transparent 38%
+          ),
+          repeating-linear-gradient(
+            132deg,
+            transparent 0 24px,
+            #ffffff15 25px 26px,
+            transparent 27px 53px
+          );
+        transform: rotate(-8deg) scale(1.1);
+      }
+      .poster:after {
+        content: "";
+        position: absolute;
+        width: 190px;
+        height: 250px;
+        border: 1px solid #ffffff75;
+        border-radius: 48% 52% 46% 54%;
+        left: 50%;
+        top: 46%;
+        transform: translate(-50%, -50%) rotate(29deg);
+        box-shadow:
+          0 0 35px #fff2,
+          inset 0 0 25px #fff2;
+      }
+      .poster-kicker,
+      .poster-symbol,
+      .poster-label {
+        position: absolute;
+        z-index: 1;
+        color: #fff;
+        font-family: "DM Mono", monospace;
+        text-shadow: 0 2px 15px #0007;
+      }
+      .poster-kicker {
+        top: 16px;
+        left: 17px;
+        font-size: 9px;
+        letter-spacing: 0.2em;
+        opacity: 0.8;
+      }
+      .poster-symbol {
+        left: 50%;
+        top: 48%;
+        transform: translate(-50%, -50%);
+        font:
+          800 72px Manrope,
+          sans-serif;
+        letter-spacing: -0.1em;
+        color: #fff9;
+      }
+      .poster-label {
+        right: 16px;
+        bottom: 15px;
+        font-size: 9px;
+        letter-spacing: 0.16em;
+        writing-mode: vertical-rl;
+      }
+      .poster-play {
+        position: absolute;
+        z-index: 2;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 54px;
+        height: 54px;
+        border-radius: 50%;
+        border: 1px solid #ffffffa8;
+        background: #ffffff50;
+        color: white;
+        backdrop-filter: blur(10px);
+        font-size: 17px;
+        box-shadow: 0 5px 25px #0003;
+      }
+      .card-copy {
+        padding: 15px 7px 6px;
+        color: #fff;
+      }
+      .card-title {
+        font-size: 14px;
+        font-weight: 750;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        letter-spacing: -0.025em;
+      }
+      .card-subtitle {
+        font-size: 10px;
+        color: #ffffffa8;
+        margin-top: 6px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .card-add {
+        position: absolute;
+        right: 14px;
+        bottom: 16px;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        border: 1px solid #ffffff35;
+        background: #ffffff14;
+        color: #ffd3aa;
+        font-size: 17px;
+        z-index: 2;
+      }
+      .carousel-arrow {
+        position: absolute;
+        z-index: 4;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 42px;
+        height: 42px;
+        border: 1px solid #ffffff24;
+        border-radius: 50%;
+        background: #1d110e80;
+        color: #ffe0c3;
+        backdrop-filter: blur(12px);
+        font-size: 17px;
+        transition: 0.2s;
+      }
+      .carousel-arrow:hover {
+        background: #ff9a5230;
+        border-color: #ffc07880;
+      }
+      .carousel-arrow.left {
+        left: calc(50% - 360px);
+      }
+      .carousel-arrow.right {
+        right: calc(50% - 360px);
+      }
+      .stage-label {
+        position: absolute;
+        z-index: 3;
+        left: 50%;
+        bottom: 17px;
+        transform: translateX(-50%);
+        color: #e6b995;
+        font:
+          9px "DM Mono",
+          monospace;
+        letter-spacing: 0.16em;
+        white-space: nowrap;
+      }
+      .track-info {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+      }
+      .cover {
+        width: 58px;
+        height: 58px;
+        border-radius: 17px;
+        flex: none;
+        position: relative;
+        overflow: hidden;
+        background: linear-gradient(140deg, #743a25, #ef8249 55%, #ffd18c);
+        box-shadow: 0 9px 34px #f28a4430;
+      }
+      .cover:before,
+      .cover:after {
+        content: "";
+        position: absolute;
+        border: 1px solid #ffffff65;
+        border-radius: 50%;
+        width: 85px;
+        height: 85px;
+        left: -14px;
+        top: -16px;
+      }
+      .cover:after {
+        width: 49px;
+        height: 49px;
+        left: 24px;
+        top: 26px;
+        border-color: #ffffff88;
+      }
+      .track-title {
+        font-size: 16px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+      .track-artist {
+        color: #a2a1b1;
+        font-size: 12px;
+        margin-top: 4px;
+      }
+      .track-meta {
+        margin-left: auto;
+        text-align: right;
+        color: #aaa8bb;
+        font:
+          10px "DM Mono",
+          monospace;
+      }
+      .side {
+        position: fixed;
+        z-index: 12;
+        right: 20px;
+        top: 82px;
+        bottom: 108px;
+        width: min(360px, calc(100vw - 32px));
+        display: flex;
+        flex-direction: column;
+        border: 1px solid var(--line);
+        background: linear-gradient(
+          145deg,
+          rgba(39, 29, 23, 0.95),
+          rgba(21, 16, 13, 0.96)
+        );
+        border-radius: 24px;
+        padding: 22px;
+        box-shadow: 0 24px 80px #0009;
+        backdrop-filter: blur(24px);
+        transform: translateX(calc(100% + 32px));
+        transition: transform 0.38s cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+      .side.open {
+        transform: translateX(0);
+      }
+      .side-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 20px;
+      }
+      .side-head h2 {
+        font-size: 14px;
+        margin: 0;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+      .side-close {
+        margin-left: auto;
+        margin-right: 10px;
+        background: transparent;
+        color: #b7a8a0;
+        font-size: 18px;
+      }
+      .count {
+        color: #a3a0b3;
+        font:
+          10px "DM Mono",
+          monospace;
+      }
+      .tabs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        padding: 4px;
+        background: #ffffff07;
+        border-radius: 12px;
+        margin: 0 0 14px;
+        gap: 4px;
+      }
+      .tab {
+        border-radius: 9px;
+        padding: 9px 6px;
+        background: transparent;
+        color: #9993a0;
+        font-size: 10px;
+        transition: 0.2s;
+      }
+      .tab.active {
+        color: #ffd1a3;
+        background: #ff9a521c;
+        box-shadow: inset 0 0 0 1px #ffbf7820;
+      }
+      .search {
+        width: 100%;
+        border: 1px solid var(--line);
+        background: #ffffff08;
+        border-radius: 11px;
+        padding: 10px 12px;
+        color: #fff4e8;
+        font:
+          11px Manrope,
+          sans-serif;
+        outline: none;
+        margin-bottom: 12px;
+      }
+      .search:focus {
+        border-color: #ffad6670;
+      }
+      .search::placeholder {
+        color: #77717a;
+      }
+      .drop {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+        padding: 13px 14px;
+        margin-bottom: 16px;
+        text-align: left;
+        border: 1px dashed #d9855266;
+        border-radius: 14px;
+        background: #ff9a520a;
+        transition: 0.2s;
+      }
+      .drop:hover,
+      .drop.drag {
+        border-color: #ffb36d;
+        background: #ff9a5218;
+        transform: translateY(-1px);
+      }
+      .upload-icon {
+        width: 31px;
+        height: 31px;
+        border-radius: 10px;
+        background: #ff9a521b;
+        color: #ffc078;
+        display: grid;
+        place-items: center;
+        font-size: 18px;
+      }
+      .drop strong {
+        display: block;
+        font-size: 11px;
+      }
+      .drop small {
+        display: block;
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 10px;
+      }
+      .list {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        flex: 1;
+        min-height: 80px;
+        overflow: auto;
+      }
+      .empty {
+        padding: 26px 12px;
+        text-align: center;
+        color: #8f8c9f;
+        font-size: 11px;
+        line-height: 1.7;
+        border-top: 1px solid var(--line);
+      }
+      .song {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        padding: 10px;
+        border-radius: 13px;
+        cursor: pointer;
+        transition: 0.2s;
+        border: 1px solid transparent;
+      }
+      .song:hover {
+        background: #ffffff08;
+      }
+      .song.active {
+        background: linear-gradient(90deg, #ff9a5218, #ffc0780a);
+        border-color: #ffc07820;
+      }
+      .song-cover {
+        width: 37px;
+        height: 37px;
+        border-radius: 11px;
+        flex: none;
+        background: linear-gradient(145deg, #63301f, #d77c42);
+        display: grid;
+        place-items: center;
+        color: #ffffffad;
+        font-size: 13px;
+      }
+      .song:nth-child(3n) .song-cover {
+        background: linear-gradient(145deg, #79502d, #ddb16a);
+      }
+      .song:nth-child(3n + 1) .song-cover {
+        background: linear-gradient(145deg, #834329, #f0a05d);
+      }
+      .song-copy {
+        min-width: 0;
+        flex: 1;
+      }
+      .song-name {
+        font-size: 11px;
+        font-weight: 700;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        overflow: hidden;
+      }
+      .song-artist {
+        font-size: 10px;
+        color: #9492a4;
+        margin-top: 4px;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        overflow: hidden;
+      }
+      .song-time {
+        color: #9a97aa;
+        font:
+          10px "DM Mono",
+          monospace;
+      }
+      .song-action {
+        flex: none;
+        width: 27px;
+        height: 27px;
+        border: 1px solid #ffffff12;
+        border-radius: 9px;
+        background: #ffffff08;
+        color: #ffc078;
+        font-size: 15px;
+        opacity: 0.65;
+        transition: 0.15s;
+      }
+      .song:hover .song-action,
+      .song-action:hover {
+        opacity: 1;
+        background: #ff9a5218;
+        border-color: #ffbd7540;
+      }
+      .footnote {
+        margin-top: 19px;
+        color: #777487;
+        font-size: 10px;
+        line-height: 1.6;
+      }
+      .player {
+        position: fixed;
+        z-index: 10;
+        bottom: 18px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: min(1050px, calc(100% - 40px));
+        border: 1px solid #ffffff2b;
+        background: rgba(42, 27, 28, 0.78);
+        backdrop-filter: blur(24px);
+        border-radius: 999px;
+        padding: 12px 24px;
+        box-shadow:
+          0 16px 70px #0008,
+          inset 0 1px #ffffff17;
+        display: grid;
+        grid-template-columns: 1fr minmax(250px, 1.2fr) 1fr;
+        align-items: center;
+        gap: 20px;
+      }
+      .mini {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+      }
+      .mini .cover {
+        width: 39px;
+        height: 39px;
+        border-radius: 12px;
+      }
+      .mini .track-title {
+        font-size: 11px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .mini .track-artist {
+        font-size: 10px;
+      }
+      .transport {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 7px;
+      }
+      .buttons {
+        display: flex;
+        align-items: center;
+        gap: 22px;
+      }
+      .icon-btn {
+        background: transparent;
+        color: #a09eae;
+        font-size: 15px;
+        padding: 3px;
+        line-height: 1;
+        transition: 0.15s;
+      }
+      .icon-btn:hover,
+      .icon-btn.selected {
+        color: #ffc078;
+      }
+      .play {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: #fff4e8;
+        color: #321909;
+        font-size: 13px;
+        box-shadow: 0 0 24px #ffad6650;
+      }
+      .play:hover {
+        transform: scale(1.06);
+      }
+      .timeline {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        width: 100%;
+        color: #9290a2;
+        font:
+          9px "DM Mono",
+          monospace;
+      }
+      input[type="range"] {
+        accent-color: #ffad66;
+        height: 3px;
+        cursor: pointer;
+      }
+      #seek {
+        flex: 1;
+        min-width: 0;
+      }
+      .volume {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 10px;
+        color: #9f9cac;
+        font-size: 13px;
+      }
+      #volume {
+        width: 84px;
+      }
+      input[type="file"] {
+        display: none;
+      }
+      @media (max-width: 850px) {
+        main {
+          margin-top: 33px;
+        }
+        .stage {
+          height: 480px;
+          min-height: 400px;
+          margin-left: -12px;
+          margin-right: -12px;
+        }
+        .coverflow-card {
+          width: 260px;
+          height: 380px;
+          margin: -190px 0 0 -130px;
+        }
+        .poster {
+          height: 250px;
+        }
+        .coverflow-card.prev {
+          transform: translate3d(-178px, 10px, -90px) rotateY(25deg) scale(0.78);
+        }
+        .coverflow-card.next {
+          transform: translate3d(178px, 10px, -90px) rotateY(-25deg) scale(0.78);
+        }
+        .coverflow-card.far-prev {
+          transform: translate3d(-305px, 18px, -220px) rotateY(32deg)
+            scale(0.62);
+        }
+        .coverflow-card.far-next {
+          transform: translate3d(305px, 18px, -220px) rotateY(-32deg)
+            scale(0.62);
+        }
+        .carousel-arrow.left {
+          left: calc(50% - 270px);
+        }
+        .carousel-arrow.right {
+          right: calc(50% - 270px);
+        }
+        .player {
+          grid-template-columns: 1fr auto;
+          gap: 12px;
+        }
+        .transport {
+          grid-column: 1 / -1;
+          grid-row: 2;
+        }
+        .volume {
+          display: none;
+        }
+        .mini {
+          grid-column: 1;
+          grid-row: 1;
+        }
+        .top-right .quality {
+          display: none;
+        }
+      }
+      @media (max-width: 500px) {
+        .app {
+          width: calc(100% - 24px);
+          padding-top: 18px;
+        }
+        main {
+          margin-top: 30px;
+        }
+        .stage {
+          height: 430px;
+          min-height: 370px;
+          margin-top: 6px;
+        }
+        .coverflow-card {
+          width: 230px;
+          height: 348px;
+          margin: -174px 0 0 -115px;
+          padding: 8px;
+          border-radius: 21px;
+        }
+        .poster {
+          height: 226px;
+        }
+        .poster-symbol {
+          font-size: 60px;
+        }
+        .coverflow-card.prev {
+          transform: translate3d(-126px, 14px, -100px) rotateY(27deg) scale(0.7);
+        }
+        .coverflow-card.next {
+          transform: translate3d(126px, 14px, -100px) rotateY(-27deg) scale(0.7);
+        }
+        .coverflow-card.far-prev {
+          transform: translate3d(-210px, 24px, -230px) rotateY(34deg)
+            scale(0.54);
+        }
+        .coverflow-card.far-next {
+          transform: translate3d(210px, 24px, -230px) rotateY(-34deg)
+            scale(0.54);
+        }
+        .carousel-arrow {
+          width: 34px;
+          height: 34px;
+        }
+        .carousel-arrow.left {
+          left: calc(50% - 180px);
+        }
+        .carousel-arrow.right {
+          right: calc(50% - 180px);
+        }
+        .stage-label {
+          bottom: 4px;
+          font-size: 8px;
+        }
+        .library-toggle {
+          padding: 9px 11px;
+          font-size: 9px;
+        }
+        .player {
+          bottom: 9px;
+          width: calc(100% - 20px);
+          padding: 10px 14px;
+          border-radius: 19px;
+        }
+        .buttons {
+          gap: 20px;
+        }
+        .side {
+          top: 65px;
+          right: 10px;
+          bottom: 100px;
+          padding: 17px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        <div class="brand">
+          <div class="brand-mark">♫</div>
+          NOCTURNE
+        </div>
+        <div class="top-right">
+          <span class="quality"><i class="live"></i>NOCTURNE · NOW PLAYING</span
+          ><button class="library-toggle" id="library-toggle">
+            MY LIBRARY&nbsp; <span id="header-count">00</span>
+          </button>
+        </div>
+      </header>
+      <main>
+        <section class="visual-column">
+          <div class="eyebrow">YOUR SOUND · YOUR SPACE</div>
+          <h1>Find your <span>next favorite.</span></h1>
+          <div class="stage">
+            <canvas id="viz" aria-hidden="true"></canvas>
+            <div class="carousel" id="carousel"></div>
+            <button
+              class="carousel-arrow left"
+              id="carousel-prev"
+              aria-label="이전 곡"
+            >
+              ‹</button
+            ><button
+              class="carousel-arrow right"
+              id="carousel-next"
+              aria-label="다음 곡"
+            >
+              ›
+            </button>
+            <div class="stage-label" id="carousel-position">
+              YOUR COLLECTION&nbsp; / &nbsp;00
+            </div>
+          </div>
+          <div class="track-info">
+            <div class="cover"></div>
+            <div>
+              <div class="track-title" id="current-title">Choose a track</div>
+              <div class="track-artist" id="current-artist">
+                Your music, your space
+              </div>
+            </div>
+            <div class="track-meta" id="track-format">NO TRACK</div>
+          </div>
+        </section>
+        <aside class="side" id="library-panel">
+          <div class="side-head">
+            <h2 id="list-heading">Music library</h2>
+            <button
+              class="side-close"
+              id="library-close"
+              aria-label="라이브러리 닫기"
+            >
+              ×</button
+            ><span class="count" id="count">00 TRACKS</span>
+          </div>
+          <div class="tabs">
+            <button class="tab active" data-view="library">곡 목록</button
+            ><button class="tab" data-view="playlist">
+              내 플레이리스트 <span id="playlist-count">0</span>
+            </button>
+          </div>
+          <input
+            class="search"
+            id="search"
+            type="search"
+            placeholder="곡 제목 검색"
+            aria-label="곡 제목 검색"
+          />
+          <label class="drop" id="drop-zone" for="file-input"
+            ><span class="upload-icon">＋</span
+            ><span
+              ><strong>Add your music</strong
+              ><small>Drop audio here or browse files</small></span
+            ></label
+          >
+          <input id="file-input" type="file" accept="audio/*" multiple />
+          <div class="list" id="list">
+            <div class="empty">
+              Your listening room is ready.<br />Choose an audio file to begin.
+            </div>
+          </div>
+          <div class="footnote">
+            내 플레이리스트와 오디오 파일은 이 브라우저에 저장됩니다.<br />MP3,
+            WAV, AAC, OGG 등 브라우저 지원 형식.
+          </div>
+        </aside>
+      </main>
+    </div>
+    <div class="player">
+      <div class="mini">
+        <div class="cover"></div>
+        <div style="min-width: 0">
+          <div class="track-title" id="mini-title">Choose a track</div>
+          <div class="track-artist" id="mini-artist">NOCTURNE PLAYER</div>
+        </div>
+      </div>
+      <div class="transport">
+        <div class="buttons">
+          <button class="icon-btn" id="shuffle" title="Shuffle">⤨</button
+          ><button class="icon-btn" id="prev" title="Previous">|◀</button
+          ><button class="play" id="play" title="Play or pause">▶</button
+          ><button class="icon-btn" id="next" title="Next">▶|</button
+          ><button class="icon-btn" id="loop" title="Repeat">↻</button>
+        </div>
+        <div class="timeline">
+          <span id="elapsed">0:00</span
+          ><input id="seek" type="range" min="0" max="1000" value="0" /><span
+            id="duration"
+            >0:00</span
+          >
+        </div>
+      </div>
+      <div class="volume">
+        <span>◖</span
+        ><input
+          id="volume"
+          type="range"
+          min="0"
+          max="1"
+          step=".01"
+          value=".8"
+        />
+      </div>
+    </div>
+    <audio id="audio" preload="metadata"></audio>
+    <script type="module">
+      import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
+      const audio = document.querySelector("#audio");
+      const fileInput = document.querySelector("#file-input");
+      const list = document.querySelector("#list");
+      const seek = document.querySelector("#seek");
+      let tracks = [],
+        playlistIds = JSON.parse(
+          localStorage.getItem("nocturne-playlist") || "[]",
+        ),
+        view = "library",
+        playbackQueue = [],
+        active = -1,
+        carouselIndex = 0,
+        context,
+        analyser,
+        source,
+        data,
+        repeat = false,
+        shuffle = false;
+      const dbReady = new Promise((resolve, reject) => {
+        const req = indexedDB.open("nocturne-audio-library", 1);
+        req.onupgradeneeded = () =>
+          req.result.createObjectStore("tracks", { keyPath: "id" });
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+      const fmt = (t) =>
+        Number.isFinite(t)
+          ? `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`
+          : "0:00";
+      const nameOf = (file) =>
+        file.name
+          .replace(/\.[^.]+$/, "")
+          .replace(/[_-]+/g, " ")
+          .trim();
+      const makeId = () =>
+        crypto.randomUUID
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      function ensureAudioGraph() {
+        if (context) {
+          if (context.state === "suspended") context.resume();
+          return;
+        }
+        context = new AudioContext();
+        analyser = context.createAnalyser();
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.84;
+        source = context.createMediaElementSource(audio);
+        source.connect(analyser);
+        analyser.connect(context.destination);
+        data = new Uint8Array(analyser.frequencyBinCount);
+      }
+      function playlistTracks() {
+        return playlistIds
+          .map((id) => tracks.find((t) => t.id === id))
+          .filter(Boolean);
+      }
+      function persistPlaylist() {
+        localStorage.setItem("nocturne-playlist", JSON.stringify(playlistIds));
+        document.querySelector("#playlist-count").textContent =
+          playlistIds.length;
+      }
+      function carouselTracks() {
+        return view === "playlist" ? playlistTracks() : tracks;
+      }
+      function renderCarousel() {
+        const root = document.querySelector("#carousel"),
+          items = carouselTracks(),
+          playing = playbackQueue[active];
+        if (playing) {
+          const at = items.findIndex((track) => track.id === playing.id);
+          if (at >= 0) carouselIndex = at;
+        }
+        root.innerHTML = "";
+        if (!items.length) {
+          const card = document.createElement("div");
+          card.className = "coverflow-card current placeholder";
+          card.innerHTML =
+            '<div class="poster" style="--hue:25"><span class="poster-kicker">NOCTURNE · 001</span><span class="poster-symbol">♫</span><span class="poster-label">ADD YOUR MUSIC</span><button class="poster-play" aria-label="음악 추가">＋</button></div><div class="card-copy"><div class="card-title">Your next favorite</div><div class="card-subtitle">음악을 추가해 나만의 컬렉션을 시작하세요</div></div>';
+          card.querySelector(".poster-play").addEventListener("click", (e) => {
+            e.stopPropagation();
+            fileInput.click();
+          });
+          card.addEventListener("click", () => fileInput.click());
+          root.append(card);
+          document.querySelector("#carousel-position").textContent =
+            view === "playlist"
+              ? "YOUR PLAYLIST  /  00"
+              : "YOUR COLLECTION  /  00";
+          return;
+        }
+        carouselIndex = (carouselIndex + items.length) % items.length;
+        const offsets =
+          items.length > 3
+            ? [-2, -1, 0, 1, 2]
+            : items.length === 1
+              ? [0]
+              : [-1, 0, 1];
+        offsets.forEach((offset) => {
+          const index = (carouselIndex + offset + items.length) % items.length,
+            track = items[index],
+            card = document.createElement("div");
+          let pos =
+            offset === 0
+              ? "current"
+              : offset === -1
+                ? "prev"
+                : offset === 1
+                  ? "next"
+                  : offset < 0
+                    ? "far-prev"
+                    : "far-next";
+          card.className = `coverflow-card ${pos}`;
+          card.style.setProperty("--hue", String((22 + index * 47) % 360));
+          card.innerHTML =
+            '<div class="poster"><span class="poster-kicker">NOCTURNE · ' +
+            String(index + 1).padStart(2, "0") +
+            '</span><span class="poster-symbol"></span><span class="poster-label">NOW PLAYING</span><button class="poster-play" aria-label="재생">▶</button></div><div class="card-copy"><div class="card-title"></div><div class="card-subtitle">LOCAL AUDIO · YOUR LIBRARY</div><button class="card-add" aria-label="내 플레이리스트에 추가">+</button></div>';
+          card.querySelector(".poster-symbol").textContent = (
+            track.name.trim()[0] || "♫"
+          ).toUpperCase();
+          card.querySelector(".card-title").textContent = track.name;
+          card.addEventListener("click", () => {
+            carouselIndex = index;
+            if (offset === 0) playTrack(index, items);
+            else renderCarousel();
+          });
+          card.querySelector(".poster-play").addEventListener("click", (e) => {
+            e.stopPropagation();
+            carouselIndex = index;
+            playTrack(index, items);
+          });
+          card.querySelector(".card-add").addEventListener("click", (e) => {
+            e.stopPropagation();
+            togglePlaylist(track.id);
+          });
+          root.append(card);
+          const finalTransform = getComputedStyle(card).transform,
+            finalOpacity =
+              pos === "current" ? 1 : pos.startsWith("far") ? 0.38 : 0.75;
+          card.animate(
+            [
+              {
+                opacity: 0,
+                transform: "translate3d(0,28px,-210px) scale(.72)",
+              },
+              { opacity: finalOpacity, transform: finalTransform },
+            ],
+            { duration: 620, easing: "cubic-bezier(.2,.8,.2,1)" },
+          );
+        });
+        document.querySelector("#carousel-position").textContent =
+          `${view === "playlist" ? "MY PLAYLIST" : "YOUR COLLECTION"}  /  ${String(carouselIndex + 1).padStart(2, "0")} — ${String(items.length).padStart(2, "0")}`;
+      }
+      function renderList() {
+        const source = view === "playlist" ? playlistTracks() : tracks,
+          query = document.querySelector("#search").value.trim().toLowerCase(),
+          shown = source.filter((t) => t.name.toLowerCase().includes(query));
+        document.querySelector("#list-heading").textContent =
+          view === "playlist" ? "My playlist" : "Music library";
+        document.querySelector("#count").textContent =
+          `${String(source.length).padStart(2, "0")} TRACK${source.length === 1 ? "" : "S"}`;
+        document.querySelector("#header-count").textContent = String(
+          tracks.length,
+        ).padStart(2, "0");
+        document.querySelector("#drop-zone").hidden = view === "playlist";
+        renderCarousel();
+        if (!shown.length) {
+          list.innerHTML =
+            view === "playlist"
+              ? '<div class="empty">아직 플레이리스트가 비어 있어요.<br>곡 목록에서 +를 눌러 추가하세요.</div>'
+              : '<div class="empty">곡 목록이 비어 있어요.<br>오디오 파일을 추가해 시작하세요.</div>';
+          return;
+        }
+        list.innerHTML = "";
+        shown.forEach((track) => {
+          const inPlaylist = playlistIds.includes(track.id),
+            row = document.createElement("div");
+          row.className =
+            "song" + (playbackQueue[active]?.id === track.id ? " active" : "");
+          row.innerHTML = `<div class="song-cover">♫</div><div class="song-copy"><div class="song-name"></div><div class="song-artist">LOCAL AUDIO</div></div><span class="song-time">${track.duration ? fmt(track.duration) : "—:——"}</span><button class="song-action" title="${view === "playlist" ? "플레이리스트에서 제거" : inPlaylist ? "플레이리스트에서 제거" : "내 플레이리스트에 추가"}" aria-label="${view === "playlist" ? "플레이리스트에서 제거" : inPlaylist ? "플레이리스트에서 제거" : "내 플레이리스트에 추가"}">${view === "playlist" || inPlaylist ? "−" : "+"}</button>`;
+          row.querySelector(".song-name").textContent = track.name;
+          row.addEventListener("click", (e) => {
+            if (!e.target.closest(".song-action"))
+              playTrack(
+                view === "playlist"
+                  ? playlistTracks().indexOf(track)
+                  : tracks.indexOf(track),
+                view === "playlist" ? playlistTracks() : tracks,
+              );
+          });
+          row.querySelector(".song-action").addEventListener("click", (e) => {
+            e.stopPropagation();
+            togglePlaylist(track.id);
+          });
+          list.append(row);
+        });
+      }
+      async function addFiles(files) {
+        const fresh = [...files].filter((f) => f.type.startsWith("audio/"));
+        for (const file of fresh) {
+          const track = {
+            id: makeId(),
+            file,
+            name: nameOf(file),
+            url: URL.createObjectURL(file),
+            duration: 0,
+          };
+          tracks.push(track);
+          const db = await dbReady;
+          db.transaction("tracks", "readwrite")
+            .objectStore("tracks")
+            .put({ id: track.id, name: track.name, file });
+          const probe = new Audio();
+          probe.preload = "metadata";
+          probe.src = track.url;
+          probe.onloadedmetadata = () => {
+            track.duration = probe.duration;
+            renderList();
+          };
+        }
+        if (!fresh.length) return;
+        renderList();
+        if (active < 0) playTrack(0, tracks);
+      }
+      function togglePlaylist(id) {
+        playlistIds = playlistIds.includes(id)
+          ? playlistIds.filter((x) => x !== id)
+          : [...playlistIds, id];
+        persistPlaylist();
+        renderList();
+      }
+      function playTrack(i, queue = tracks) {
+        if (!queue.length) return;
+        playbackQueue = queue;
+        active = (i + queue.length) % queue.length;
+        const track = queue[active];
+        audio.src = track.url;
+        audio.load();
+        ensureAudioGraph();
+        audio.play().catch(() => {});
+        const title = track.name;
+        document
+          .querySelectorAll("#current-title,#mini-title")
+          .forEach((el) => (el.textContent = title));
+        document.querySelector("#current-artist").textContent = "LOCAL AUDIO";
+        document.querySelector("#mini-artist").textContent = "NOW PLAYING";
+        document.querySelector("#track-format").textContent = (
+          track.file.name.split(".").pop() || "AUDIO"
+        ).toUpperCase();
+        renderList();
+      }
+      async function restoreLibrary() {
+        try {
+          const db = await dbReady,
+            req = db.transaction("tracks").objectStore("tracks").getAll();
+          req.onsuccess = () => {
+            tracks = req.result.map((item) => ({
+              id: item.id,
+              file: item.file,
+              name: item.name,
+              url: URL.createObjectURL(item.file),
+              duration: 0,
+            }));
+            playlistIds = playlistIds.filter((id) =>
+              tracks.some((track) => track.id === id),
+            );
+            for (const track of tracks) {
+              const probe = new Audio();
+              probe.preload = "metadata";
+              probe.src = track.url;
+              probe.onloadedmetadata = () => {
+                track.duration = probe.duration;
+                renderList();
+              };
+            }
+            persistPlaylist();
+            renderList();
+          };
+        } catch (error) {
+          console.warn("Could not restore local audio library", error);
+        }
+      }
+      fileInput.addEventListener("change", (e) => {
+        addFiles(e.target.files);
+        fileInput.value = "";
+      });
+      document.querySelectorAll(".tab").forEach((tab) =>
+        tab.addEventListener("click", () => {
+          view = tab.dataset.view;
+          document
+            .querySelectorAll(".tab")
+            .forEach((t) => t.classList.toggle("active", t === tab));
+          document.querySelector("#search").value = "";
+          renderList();
+        }),
+      );
+      document.querySelector("#search").addEventListener("input", renderList);
+      document
+        .querySelector("#library-toggle")
+        .addEventListener("click", () =>
+          document.querySelector("#library-panel").classList.toggle("open"),
+        );
+      document
+        .querySelector("#library-close")
+        .addEventListener("click", () =>
+          document.querySelector("#library-panel").classList.remove("open"),
+        );
+      document.querySelector("#carousel-prev").addEventListener("click", () => {
+        const items = carouselTracks();
+        if (items.length) {
+          carouselIndex = (carouselIndex - 1 + items.length) % items.length;
+          renderCarousel();
+        }
+      });
+      document.querySelector("#carousel-next").addEventListener("click", () => {
+        const items = carouselTracks();
+        if (items.length) {
+          carouselIndex = (carouselIndex + 1) % items.length;
+          renderCarousel();
+        }
+      });
+      restoreLibrary();
+      const zone = document.querySelector("#drop-zone");
+      for (const ev of ["dragenter", "dragover"])
+        zone.addEventListener(ev, (e) => {
+          e.preventDefault();
+          zone.classList.add("drag");
+        });
+      for (const ev of ["dragleave", "drop"])
+        zone.addEventListener(ev, (e) => {
+          e.preventDefault();
+          zone.classList.remove("drag");
+        });
+      zone.addEventListener("drop", (e) => addFiles(e.dataTransfer.files));
+      document.addEventListener("dragover", (e) => e.preventDefault());
+      document.addEventListener("drop", (e) => {
+        if (e.target !== zone && !zone.contains(e.target)) {
+          e.preventDefault();
+          addFiles(e.dataTransfer.files);
+        }
+      });
+      document.querySelector("#play").addEventListener("click", () => {
+        if (active < 0) {
+          const q = view === "playlist" ? playlistTracks() : tracks;
+          if (q.length) playTrack(0, q);
+          else if (view === "library") fileInput.click();
+          return;
+        }
+        ensureAudioGraph();
+        if (audio.paused) {
+          audio.play();
+          document.querySelector("#play").textContent = "Ⅱ";
+        } else {
+          audio.pause();
+          document.querySelector("#play").textContent = "▶";
+        }
+      });
+      document.querySelector("#prev").addEventListener("click", () => {
+        if (audio.currentTime > 3) audio.currentTime = 0;
+        else if (playbackQueue.length) playTrack(active - 1, playbackQueue);
+      });
+      document.querySelector("#next").addEventListener("click", () => {
+        if (playbackQueue.length)
+          playTrack(
+            shuffle
+              ? Math.floor(Math.random() * playbackQueue.length)
+              : active + 1,
+            playbackQueue,
+          );
+      });
+      document.querySelector("#shuffle").addEventListener("click", (e) => {
+        shuffle = !shuffle;
+        e.currentTarget.classList.toggle("selected", shuffle);
+        if (shuffle && active < 0) {
+          const q = view === "playlist" ? playlistTracks() : tracks;
+          if (q.length) playTrack(Math.floor(Math.random() * q.length), q);
+        }
+      });
+      document.querySelector("#loop").addEventListener("click", (e) => {
+        repeat = !repeat;
+        audio.loop = repeat;
+        e.currentTarget.classList.toggle("selected", repeat);
+      });
+      document
+        .querySelector("#volume")
+        .addEventListener(
+          "input",
+          (e) => (audio.volume = Number(e.target.value)),
+        );
+      seek.addEventListener("input", () => {
+        if (audio.duration)
+          audio.currentTime = (seek.value / 1000) * audio.duration;
+      });
+      audio.addEventListener("timeupdate", () => {
+        if (audio.duration) {
+          seek.value = (audio.currentTime / audio.duration) * 1000;
+          document.querySelector("#elapsed").textContent = fmt(
+            audio.currentTime,
+          );
+          document.querySelector("#duration").textContent = fmt(audio.duration);
+        }
+      });
+      audio.addEventListener("ended", () => {
+        if (!repeat && playbackQueue.length)
+          playTrack(
+            shuffle
+              ? Math.floor(Math.random() * playbackQueue.length)
+              : active + 1,
+            playbackQueue,
+          );
+      });
+      audio.addEventListener(
+        "play",
+        () => (document.querySelector("#play").textContent = "Ⅱ"),
+      );
+      audio.addEventListener(
+        "pause",
+        () => (document.querySelector("#play").textContent = "▶"),
+      );
+
+      // Subtle Three.js light field behind the CSS 3D glass card carousel.
+      const canvas = document.querySelector("#viz"),
+        renderer = new THREE.WebGLRenderer({
+          canvas,
+          alpha: true,
+          antialias: true,
+        });
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+      renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
+      renderer.setClearColor(0x000000, 0);
+      const scene = new THREE.Scene(),
+        camera = new THREE.PerspectiveCamera(
+          42,
+          canvas.clientWidth / canvas.clientHeight,
+          0.1,
+          100,
+        );
+      camera.position.z = 10;
+      const halo = new THREE.Mesh(
+        new THREE.TorusGeometry(2.9, 0.012, 8, 180),
+        new THREE.MeshBasicMaterial({
+          color: 0xff9d58,
+          transparent: true,
+          opacity: 0.34,
+        }),
+      );
+      halo.position.z = -1.4;
+      scene.add(halo);
+      const starCount = 520,
+        starPos = new Float32Array(starCount * 3);
+      for (let i = 0; i < starCount; i++) {
+        starPos[i * 3] = (Math.random() - 0.5) * 15;
+        starPos[i * 3 + 1] = (Math.random() - 0.5) * 8;
+        starPos[i * 3 + 2] = (Math.random() - 0.5) * 5 - 1.5;
+      }
+      const starsGeo = new THREE.BufferGeometry();
+      starsGeo.setAttribute("position", new THREE.BufferAttribute(starPos, 3));
+      const stars = new THREE.Points(
+        starsGeo,
+        new THREE.PointsMaterial({
+          color: 0xffc078,
+          size: 0.022,
+          transparent: true,
+          opacity: 0.62,
+        }),
+      );
+      scene.add(stars);
+      const resize = () => {
+        const w = canvas.clientWidth,
+          h = canvas.clientHeight;
+        if (!w || !h) return;
+        renderer.setSize(w, h, false);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+      };
+      new ResizeObserver(resize).observe(canvas);
+      const clock = new THREE.Clock();
+      function animate() {
+        requestAnimationFrame(animate);
+        const t = clock.getElapsedTime();
+        let energy = 0;
+        if (analyser) {
+          analyser.getByteFrequencyData(data);
+          energy =
+            data.reduce((sum, value) => sum + value, 0) / (data.length * 255);
+        }
+        halo.rotation.z = t * 0.04;
+        halo.scale.setScalar(1 + energy * 0.12 + Math.sin(t * 0.5) * 0.018);
+        stars.rotation.z = Math.sin(t * 0.05) * 0.035;
+        renderer.render(scene, camera);
+      }
+      animate();
+    </script>
+  </body>
+</html>
