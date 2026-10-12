@@ -538,7 +538,7 @@
       }
       .tabs {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(3, 1fr);
         padding: 4px;
         background: #ffffff07;
         border-radius: 12px;
@@ -570,6 +570,55 @@
           sans-serif;
         outline: none;
         margin-bottom: 12px;
+      }
+      .search-row {
+        display: flex;
+        gap: 7px;
+        margin-bottom: 12px;
+      }
+      .search-row .search {
+        flex: 1;
+        min-width: 0;
+        margin: 0;
+      }
+      .search-action {
+        flex: none;
+        padding: 0 13px;
+        border: 1px solid #ffb46c55;
+        border-radius: 11px;
+        background: #ff9a5218;
+        color: #ffd1a3;
+        font-size: 10px;
+      }
+      .search-action:hover {
+        background: #ff9a5230;
+      }
+      #youtube-player {
+        display: none;
+        position: absolute;
+        z-index: 6;
+        left: 50%;
+        top: 50%;
+        width: min(480px, calc(100% - 32px));
+        aspect-ratio: 16 / 9;
+        transform: translate(-50%, -50%);
+        border: 1px solid #ffffff45;
+        border-radius: 18px;
+        overflow: hidden;
+        box-shadow: 0 24px 90px #000b;
+      }
+      #youtube-player iframe {
+        width: 100%;
+        height: 100%;
+      }
+      .stage.youtube-active #youtube-player {
+        display: block;
+      }
+      .stage.youtube-active .carousel,
+      .stage.youtube-active .carousel-arrow,
+      .stage.youtube-active .stage-label {
+        visibility: hidden;
+        pointer-events: none;
       }
       .search:focus {
         border-color: #ffad6670;
@@ -979,7 +1028,7 @@
 
             <script>
               let player;
-
+              window.pendingYouTubeVideoId = null;
               const tag = document.createElement("script");
               tag.src = "https://www.youtube.com/iframe_api";
               document.head.appendChild(tag);
@@ -990,12 +1039,29 @@
                   height: "270",
                   videoId: "",
                   playerVars: { playsinline: 1 },
+                  events: {
+                    onReady: function () {
+                      window.youtubePlayer = player;
+                      if (window.pendingYouTubeVideoId) {
+                        player.loadVideoById(window.pendingYouTubeVideoId);
+                        window.pendingYouTubeVideoId = null;
+                      }
+                    },
+                    onStateChange: function (event) {
+                      if (event.data === 1) document.querySelector("#play").textContent = "Ⅱ";
+                      if (event.data === 2 || event.data === 0) document.querySelector("#play").textContent = "▶";
+                    }
+                  }
                 });
               };
 
-              function playYouTubeSong(videoId) {
-                player.loadVideoById(videoId);
-              }
+              window.playYouTubeSong = function (videoId) {
+                if (player && typeof player.loadVideoById === "function") {
+                  player.loadVideoById(videoId);
+                } else {
+                  window.pendingYouTubeVideoId = videoId;
+                }
+              };
             </script>
             <canvas id="viz" aria-hidden="true"></canvas>
             <div class="carousel" id="carousel"></div>
@@ -1039,18 +1105,14 @@
             ><span class="count" id="count">00 TRACKS</span>
           </div>
           <div class="tabs">
-            <button class="tab active" data-view="library">곡 목록</button
-            ><button class="tab" data-view="playlist">
-              내 플레이리스트 <span id="playlist-count">0</span>
-            </button>
+            <button class="tab active" data-view="library">내 곡</button>
+            <button class="tab" data-view="youtube">YouTube</button>
+            <button class="tab" data-view="playlist">플레이리스트 <span id="playlist-count">0</span></button>
           </div>
-          <input
-            class="search"
-            id="search"
-            type="search"
-            placeholder="곡 제목 검색"
-            aria-label="곡 제목 검색"
-          />
+          <div class="search-row">
+            <input class="search" id="search" type="search" placeholder="곡 제목 검색" aria-label="곡 제목 검색" />
+            <button class="search-action" id="youtube-search" type="button">검색</button>
+          </div>
           <label class="drop" id="drop-zone" for="file-input"
             ><span class="upload-icon">＋</span
             ><span
@@ -1108,6 +1170,7 @@
       </div>
     </div>
     <audio id="audio" preload="metadata"></audio>
+    <script src="./youtube%20API.js"></script>
     <script type="module">
       import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
       const audio = document.querySelector("#audio");
@@ -1128,6 +1191,13 @@
         data,
         repeat = false,
         shuffle = false;
+      let youtubeResults = [];
+      let youtubePlaylist = JSON.parse(
+        localStorage.getItem("nocturne-youtube-playlist") || "[]",
+      );
+      let youtubeQueue = [];
+      let youtubeActive = -1;
+      let currentYoutube = null;
       const dbReady = new Promise((resolve, reject) => {
         const req = indexedDB.open("nocturne-audio-library", 1);
         req.onupgradeneeded = () =>
@@ -1170,7 +1240,7 @@
       function persistPlaylist() {
         localStorage.setItem("nocturne-playlist", JSON.stringify(playlistIds));
         document.querySelector("#playlist-count").textContent =
-          playlistIds.length;
+          playlistIds.length + youtubePlaylist.length;
       }
       function carouselTracks() {
         return view === "playlist" ? playlistTracks() : tracks;
@@ -1191,9 +1261,9 @@
             '<div class="poster" style="--hue:25"><span class="poster-kicker">NOCTURNE · 001</span><span class="poster-symbol">♫</span><span class="poster-label">ADD YOUR MUSIC</span><button class="poster-play" aria-label="음악 추가">＋</button></div><div class="card-copy"><div class="card-title">Your next favorite</div><div class="card-subtitle">음악을 추가해 나만의 컬렉션을 시작하세요</div></div>';
           card.querySelector(".poster-play").addEventListener("click", (e) => {
             e.stopPropagation();
-            fileInput.click();
+            openYouTubeSearch();
           });
-          card.addEventListener("click", () => fileInput.click());
+          card.addEventListener("click", () => openYouTubeSearch());
           root.append(card);
           document.querySelector("#carousel-position").textContent =
             view === "playlist"
@@ -1265,49 +1335,146 @@
           `${view === "playlist" ? "MY PLAYLIST" : "YOUR COLLECTION"}  /  ${String(carouselIndex + 1).padStart(2, "0")} — ${String(items.length).padStart(2, "0")}`;
       }
       function renderList() {
-        const source = view === "playlist" ? playlistTracks() : tracks,
-          query = document.querySelector("#search").value.trim().toLowerCase(),
-          shown = source.filter((t) => t.name.toLowerCase().includes(query));
+        const query = document.querySelector("#search").value.trim().toLowerCase();
+        const localSource = view === "playlist" ? playlistTracks() : tracks;
+        const ytSource = view === "youtube"
+          ? youtubeResults
+          : view === "playlist" ? youtubePlaylist : [];
+        const source = view === "youtube"
+          ? ytSource
+          : [...localSource, ...ytSource.map((track) => ({ ...track, kind: "youtube" }))];
+        const shown = source.filter((track) =>
+          (track.name || track.title || "").toLowerCase().includes(query) ||
+          (track.artist || "").toLowerCase().includes(query)
+        );
+
         document.querySelector("#list-heading").textContent =
-          view === "playlist" ? "My playlist" : "Music library";
+          view === "playlist" ? "My playlist" : view === "youtube" ? "YouTube 검색" : "Music library";
         document.querySelector("#count").textContent =
-          `${String(source.length).padStart(2, "0")} TRACK${source.length === 1 ? "" : "S"}`;
+          \`\${String(source.length).padStart(2, "0")} TRACK\${source.length === 1 ? "" : "S"}\`;
         document.querySelector("#header-count").textContent = String(
           tracks.length,
         ).padStart(2, "0");
-        document.querySelector("#drop-zone").hidden = view === "playlist";
+        document.querySelector("#drop-zone").hidden = view !== "library";
+        document.querySelector("#youtube-search").hidden = view !== "youtube";
+        document.querySelector("#search").placeholder =
+          view === "youtube" ? "YouTube에서 곡 검색" : "곡 제목 검색";
         renderCarousel();
+
         if (!shown.length) {
-          list.innerHTML =
-            view === "playlist"
-              ? '<div class="empty">아직 플레이리스트가 비어 있어요.<br>곡 목록에서 +를 눌러 추가하세요.</div>'
-              : '<div class="empty">곡 목록이 비어 있어요.<br>오디오 파일을 추가해 시작하세요.</div>';
+          list.innerHTML = view === "youtube"
+            ? '<div class="empty">검색어를 입력하고 검색을 눌러 YouTube 곡을 찾아보세요.</div>'
+            : view === "playlist"
+              ? '<div class="empty">플레이리스트가 비어 있어요.<br>YouTube 검색이나 내 곡에서 +를 눌러 추가하세요.</div>'
+              : '<div class="empty">내 곡이 비어 있어요.<br>YouTube 탭에서 검색하거나 파일을 추가하세요.</div>';
           return;
         }
+
         list.innerHTML = "";
         shown.forEach((track) => {
-          const inPlaylist = playlistIds.includes(track.id),
-            row = document.createElement("div");
-          row.className =
-            "song" + (playbackQueue[active]?.id === track.id ? " active" : "");
-          row.innerHTML = `<div class="song-cover">♫</div><div class="song-copy"><div class="song-name"></div><div class="song-artist">LOCAL AUDIO</div></div><span class="song-time">${track.duration ? fmt(track.duration) : "—:——"}</span><button class="song-action" title="${view === "playlist" ? "플레이리스트에서 제거" : inPlaylist ? "플레이리스트에서 제거" : "내 플레이리스트에 추가"}" aria-label="${view === "playlist" ? "플레이리스트에서 제거" : inPlaylist ? "플레이리스트에서 제거" : "내 플레이리스트에 추가"}">${view === "playlist" || inPlaylist ? "−" : "+"}</button>`;
-          row.querySelector(".song-name").textContent = track.name;
-          row.addEventListener("click", (e) => {
-            if (!e.target.closest(".song-action"))
+          const isYoutube = track.kind === "youtube";
+          const inPlaylist = isYoutube
+            ? youtubePlaylist.some((item) => item.videoId === track.videoId)
+            : playlistIds.includes(track.id);
+          const row = document.createElement("div");
+          row.className = "song" +
+            ((!isYoutube && playbackQueue[active]?.id === track.id) ||
+             (isYoutube && currentYoutube?.videoId === track.videoId) ? " active" : "");
+          row.innerHTML = \`<div class="song-cover">\${isYoutube ? "" : "♫"}</div><div class="song-copy"><div class="song-name"></div><div class="song-artist"></div></div><span class="song-time">\${isYoutube ? "YouTube" : track.duration ? fmt(track.duration) : "—:——"}</span><button class="song-action" title="\${inPlaylist ? "플레이리스트에서 제거" : "내 플레이리스트에 추가"}" aria-label="\${inPlaylist ? "플레이리스트에서 제거" : "내 플레이리스트에 추가"}">\${inPlaylist ? "−" : "+"}</button>\`;
+          row.querySelector(".song-name").textContent = track.name || track.title;
+          row.querySelector(".song-artist").textContent = track.artist || "YouTube";
+          if (isYoutube && track.thumbnail) {
+            row.querySelector(".song-cover").style.backgroundImage = \`url("\${track.thumbnail}")\`;
+            row.querySelector(".song-cover").style.backgroundSize = "cover";
+          }
+          row.addEventListener("click", (event) => {
+            if (event.target.closest(".song-action")) return;
+            if (isYoutube) {
+              const queue = view === "playlist" ? youtubePlaylist : youtubeResults;
+              playYoutubeTrack(track, queue);
+            } else {
               playTrack(
-                view === "playlist"
-                  ? playlistTracks().indexOf(track)
-                  : tracks.indexOf(track),
+                view === "playlist" ? playlistTracks().indexOf(track) : tracks.indexOf(track),
                 view === "playlist" ? playlistTracks() : tracks,
               );
+            }
           });
-          row.querySelector(".song-action").addEventListener("click", (e) => {
-            e.stopPropagation();
-            togglePlaylist(track.id);
+          row.querySelector(".song-action").addEventListener("click", (event) => {
+            event.stopPropagation();
+            if (isYoutube) toggleYoutubePlaylist(track);
+            else togglePlaylist(track.id);
           });
           list.append(row);
         });
       }
+
+      function openYouTubeSearch() {
+        view = "youtube";
+        document.querySelectorAll(".tab").forEach((tab) =>
+          tab.classList.toggle("active", tab.dataset.view === "youtube"),
+        );
+        document.querySelector("#library-panel").classList.add("open");
+        renderList();
+        document.querySelector("#search").focus();
+      }
+
+      function toggleYoutubePlaylist(track) {
+        const exists = youtubePlaylist.some((item) => item.videoId === track.videoId);
+        youtubePlaylist = exists
+          ? youtubePlaylist.filter((item) => item.videoId !== track.videoId)
+          : [...youtubePlaylist, { ...track, kind: "youtube" }];
+        localStorage.setItem("nocturne-youtube-playlist", JSON.stringify(youtubePlaylist));
+        persistPlaylist();
+        renderList();
+      }
+
+      async function runYoutubeSearch() {
+        const query = document.querySelector("#search").value.trim();
+        if (!query) {
+          document.querySelector("#search").focus();
+          return;
+        }
+        view = "youtube";
+        list.innerHTML = '<div class="empty">YouTube 검색 중…</div>';
+        try {
+          if (typeof window.searchYouTube !== "function") {
+            throw new Error("youtube API.js 파일을 불러오지 못했어요.");
+          }
+          youtubeResults = (await window.searchYouTube(query)).map((item) => ({
+            ...item,
+            id: item.videoId,
+            name: item.title,
+            kind: "youtube",
+          }));
+          renderList();
+        } catch (error) {
+          list.innerHTML = "";
+          const message = document.createElement("div");
+          message.className = "empty";
+          message.textContent = error.message || "YouTube 검색 실패: API 키 또는 API 사용 설정을 확인해 주세요.";
+          list.append(message);
+        }
+      }
+
+      function playYoutubeTrack(track, queue = youtubeResults) {
+        if (!track?.videoId) return;
+        audio.pause();
+        currentYoutube = track;
+        youtubeQueue = queue;
+        youtubeActive = Math.max(0, queue.findIndex((item) => item.videoId === track.videoId));
+        active = -1;
+        document.querySelector(".stage").classList.add("youtube-active");
+        window.playYouTubeSong?.(track.videoId);
+        document.querySelectorAll("#current-title,#mini-title").forEach((el) => {
+          el.textContent = track.name || track.title;
+        });
+        document.querySelector("#current-artist").textContent = track.artist || "YouTube";
+        document.querySelector("#mini-artist").textContent = "YOUTUBE";
+        document.querySelector("#track-format").textContent = "YOUTUBE";
+        document.querySelector("#play").textContent = "Ⅱ";
+        renderList();
+      }
+
       async function addFiles(files) {
         const fresh = [...files].filter((f) => f.type.startsWith("audio/"));
         for (const file of fresh) {
@@ -1344,6 +1511,9 @@
       }
       function playTrack(i, queue = tracks) {
         if (!queue.length) return;
+        currentYoutube = null;
+        document.querySelector(".stage").classList.remove("youtube-active");
+        window.youtubePlayer?.stopVideo();
         playbackQueue = queue;
         active = (i + queue.length) % queue.length;
         const track = queue[active];
@@ -1404,10 +1574,17 @@
             .querySelectorAll(".tab")
             .forEach((t) => t.classList.toggle("active", t === tab));
           document.querySelector("#search").value = "";
+          if (view === "youtube") youtubeResults = [];
           renderList();
         }),
       );
-      document.querySelector("#search").addEventListener("input", renderList);
+      document.querySelector("#search").addEventListener("input", () => {
+        if (view !== "youtube") renderList();
+      });
+      document.querySelector("#search").addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && view === "youtube") runYoutubeSearch();
+      });
+      document.querySelector("#youtube-search").addEventListener("click", runYoutubeSearch);
       document
         .querySelector("#library-toggle")
         .addEventListener("click", () =>
@@ -1453,10 +1630,22 @@
         }
       });
       document.querySelector("#play").addEventListener("click", () => {
+        if (currentYoutube && window.youtubePlayer) {
+          const state = window.youtubePlayer.getPlayerState();
+          if (state === 1) {
+            window.youtubePlayer.pauseVideo();
+            document.querySelector("#play").textContent = "▶";
+          } else {
+            window.youtubePlayer.playVideo();
+            document.querySelector("#play").textContent = "Ⅱ";
+          }
+          return;
+        }
         if (active < 0) {
           const q = view === "playlist" ? playlistTracks() : tracks;
           if (q.length) playTrack(0, q);
-          else if (view === "library") fileInput.click();
+          else if (youtubePlaylist.length) playYoutubeTrack(youtubePlaylist[0], youtubePlaylist);
+          else openYouTubeSearch();
           return;
         }
         ensureAudioGraph();
@@ -1469,10 +1658,20 @@
         }
       });
       document.querySelector("#prev").addEventListener("click", () => {
-        if (audio.currentTime > 3) audio.currentTime = 0;
+        if (currentYoutube && youtubeQueue.length) {
+          youtubeActive = (youtubeActive - 1 + youtubeQueue.length) % youtubeQueue.length;
+          playYoutubeTrack(youtubeQueue[youtubeActive], youtubeQueue);
+        } else if (audio.currentTime > 3) audio.currentTime = 0;
         else if (playbackQueue.length) playTrack(active - 1, playbackQueue);
       });
       document.querySelector("#next").addEventListener("click", () => {
+        if (currentYoutube && youtubeQueue.length) {
+          youtubeActive = shuffle
+            ? Math.floor(Math.random() * youtubeQueue.length)
+            : (youtubeActive + 1) % youtubeQueue.length;
+          playYoutubeTrack(youtubeQueue[youtubeActive], youtubeQueue);
+          return;
+        }
         if (playbackQueue.length)
           playTrack(
             shuffle
@@ -1494,16 +1693,28 @@
         audio.loop = repeat;
         e.currentTarget.classList.toggle("selected", repeat);
       });
-      document
-        .querySelector("#volume")
-        .addEventListener(
-          "input",
-          (e) => (audio.volume = Number(e.target.value)),
-        );
-      seek.addEventListener("input", () => {
-        if (audio.duration)
-          audio.currentTime = (seek.value / 1000) * audio.duration;
+      document.querySelector("#volume").addEventListener("input", (event) => {
+        const volume = Number(event.target.value) * 100;
+        if (currentYoutube && window.youtubePlayer) window.youtubePlayer.setVolume(volume);
+        else audio.volume = volume / 100;
       });
+      seek.addEventListener("input", () => {
+        if (currentYoutube && window.youtubePlayer) {
+          const duration = window.youtubePlayer.getDuration();
+          if (duration) window.youtubePlayer.seekTo((seek.value / 1000) * duration, true);
+        } else if (audio.duration) {
+          audio.currentTime = (seek.value / 1000) * audio.duration;
+        }
+      });
+      setInterval(() => {
+        if (!currentYoutube || !window.youtubePlayer) return;
+        const duration = window.youtubePlayer.getDuration();
+        if (!duration) return;
+        const currentTime = window.youtubePlayer.getCurrentTime();
+        seek.value = (currentTime / duration) * 1000;
+        document.querySelector("#elapsed").textContent = fmt(currentTime);
+        document.querySelector("#duration").textContent = fmt(duration);
+      }, 500);
       audio.addEventListener("timeupdate", () => {
         if (audio.duration) {
           seek.value = (audio.currentTime / audio.duration) * 1000;
