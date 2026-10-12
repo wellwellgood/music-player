@@ -1048,10 +1048,12 @@
                       }
                     },
                     onStateChange: function (event) {
-                      if (event.data === 1) document.querySelector("#play").textContent = "Ⅱ";
-                      if (event.data === 2 || event.data === 0) document.querySelector("#play").textContent = "▶";
-                    }
-                  }
+                      if (event.data === 1)
+                        document.querySelector("#play").textContent = "Ⅱ";
+                      if (event.data === 2 || event.data === 0)
+                        document.querySelector("#play").textContent = "▶";
+                    },
+                  },
                 });
               };
 
@@ -1107,11 +1109,21 @@
           <div class="tabs">
             <button class="tab active" data-view="library">내 곡</button>
             <button class="tab" data-view="youtube">YouTube</button>
-            <button class="tab" data-view="playlist">플레이리스트 <span id="playlist-count">0</span></button>
+            <button class="tab" data-view="playlist">
+              플레이리스트 <span id="playlist-count">0</span>
+            </button>
           </div>
           <div class="search-row">
-            <input class="search" id="search" type="search" placeholder="곡 제목 검색" aria-label="곡 제목 검색" />
-            <button class="search-action" id="youtube-search" type="button">검색</button>
+            <input
+              class="search"
+              id="search"
+              type="search"
+              placeholder="곡 제목 검색"
+              aria-label="곡 제목 검색"
+            />
+            <button class="search-action" id="youtube-search" type="button">
+              검색
+            </button>
           </div>
           <label class="drop" id="drop-zone" for="file-input"
             ><span class="upload-icon">＋</span
@@ -1351,7 +1363,7 @@
         document.querySelector("#list-heading").textContent =
           view === "playlist" ? "My playlist" : view === "youtube" ? "YouTube 검색" : "Music library";
         document.querySelector("#count").textContent =
-          \`\${String(source.length).padStart(2, "0")} TRACK\${source.length === 1 ? "" : "S"}\`;
+          `${String(source.length).padStart(2, "0")} TRACK${source.length === 1 ? "" : "S"}`;
         document.querySelector("#header-count").textContent = String(
           tracks.length,
         ).padStart(2, "0");
@@ -1380,11 +1392,11 @@
           row.className = "song" +
             ((!isYoutube && playbackQueue[active]?.id === track.id) ||
              (isYoutube && currentYoutube?.videoId === track.videoId) ? " active" : "");
-          row.innerHTML = \`<div class="song-cover">\${isYoutube ? "" : "♫"}</div><div class="song-copy"><div class="song-name"></div><div class="song-artist"></div></div><span class="song-time">\${isYoutube ? "YouTube" : track.duration ? fmt(track.duration) : "—:——"}</span><button class="song-action" title="\${inPlaylist ? "플레이리스트에서 제거" : "내 플레이리스트에 추가"}" aria-label="\${inPlaylist ? "플레이리스트에서 제거" : "내 플레이리스트에 추가"}">\${inPlaylist ? "−" : "+"}</button>\`;
+          row.innerHTML = `<div class="song-cover">${isYoutube ? "" : "♫"}</div><div class="song-copy"><div class="song-name"></div><div class="song-artist"></div></div><span class="song-time">${isYoutube ? "YouTube" : track.duration ? fmt(track.duration) : "—:——"}</span><button class="song-action" title="${inPlaylist ? "플레이리스트에서 제거" : "내 플레이리스트에 추가"}" aria-label="${inPlaylist ? "플레이리스트에서 제거" : "내 플레이리스트에 추가"}">${inPlaylist ? "−" : "+"}</button>`;
           row.querySelector(".song-name").textContent = track.name || track.title;
           row.querySelector(".song-artist").textContent = track.artist || "YouTube";
           if (isYoutube && track.thumbnail) {
-            row.querySelector(".song-cover").style.backgroundImage = \`url("\${track.thumbnail}")\`;
+            row.querySelector(".song-cover").style.backgroundImage = `url("${track.thumbnail}")`;
             row.querySelector(".song-cover").style.backgroundSize = "cover";
           }
           row.addEventListener("click", (event) => {
