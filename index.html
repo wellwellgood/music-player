@@ -975,6 +975,28 @@
           <div class="eyebrow">YOUR SOUND · YOUR SPACE</div>
           <h1>Find your <span>next favorite.</span></h1>
           <div class="stage">
+            <div id="youtube-player"></div>
+
+            <script>
+              let player;
+
+              const tag = document.createElement("script");
+              tag.src = "https://www.youtube.com/iframe_api";
+              document.head.appendChild(tag);
+
+              window.onYouTubeIframeAPIReady = function () {
+                player = new YT.Player("youtube-player", {
+                  width: "480",
+                  height: "270",
+                  videoId: "",
+                  playerVars: { playsinline: 1 },
+                });
+              };
+
+              function playYouTubeSong(videoId) {
+                player.loadVideoById(videoId);
+              }
+            </script>
             <canvas id="viz" aria-hidden="true"></canvas>
             <div class="carousel" id="carousel"></div>
             <button
