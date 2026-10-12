@@ -146,6 +146,8 @@
         font-weight: 400;
       }
       .stage {
+        width: var(--stage-width, 100%);
+        max-width: 100%;
         height: min(62vh, 590px);
         min-height: 440px;
         position: relative;
@@ -154,6 +156,43 @@
         border-radius: 34px;
         perspective: 1300px;
         isolation: isolate;
+      }
+      .stage-resizer {
+        position: absolute;
+        z-index: 10;
+        top: 50%;
+        right: 5px;
+        width: 20px;
+        height: 86px;
+        transform: translateY(-50%);
+        display: grid;
+        place-items: center;
+        border: 1px solid #ffffff48;
+        border-radius: 12px;
+        background: #261812a8;
+        color: #ffd0a2;
+        cursor: ew-resize;
+        touch-action: none;
+        backdrop-filter: blur(12px);
+        box-shadow: 0 8px 28px #0006;
+      }
+      .stage-resizer::before {
+        content: "⋮";
+        font-size: 20px;
+        line-height: 1;
+        opacity: 0.9;
+      }
+      .stage-resizer:hover,
+      .stage-resizer:focus-visible {
+        border-color: #ffc078;
+        background: #ff9a5230;
+        outline: none;
+      }
+      .stage.resizing {
+        user-select: none;
+      }
+      .stage.resizing .coverflow-card {
+        transition: none;
       }
       #viz {
         width: 100%;
@@ -879,8 +918,6 @@
         .stage {
           height: 480px;
           min-height: 400px;
-          margin-left: -12px;
-          margin-right: -12px;
         }
         .coverflow-card {
           width: 260px;
@@ -1052,6 +1089,7 @@
                         document.querySelector("#play").textContent = "Ⅱ";
                       if (event.data === 2 || event.data === 0)
                         document.querySelector("#play").textContent = "▶";
+                      if (event.data === 0) window.onYouTubeTrackEnded?.();
                     },
                   },
                 });
@@ -1083,6 +1121,18 @@
             <div class="stage-label" id="carousel-position">
               YOUR COLLECTION&nbsp; / &nbsp;00
             </div>
+            <div
+              class="stage-resizer"
+              id="stage-resizer"
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="중앙 화면 너비 조절"
+              aria-valuemin="320"
+              aria-valuemax="1260"
+              aria-valuenow="1000"
+              tabindex="0"
+              title="드래그하거나 ← → 키로 너비 조절 · 두 번 클릭하면 초기화"
+            ></div>
           </div>
           <div class="track-info">
             <div class="cover"></div>
@@ -1189,6 +1239,75 @@
       const fileInput = document.querySelector("#file-input");
       const list = document.querySelector("#list");
       const seek = document.querySelector("#seek");
+      const stage = document.querySelector(".stage");
+      const stageResizer = document.querySelector("#stage-resizer");
+      const stageWidthKey = "nocturne-stage-width";
+      function setStageWidth(requestedWidth) {
+        const availableWidth = stage.parentElement.clientWidth;
+        const minWidth = Math.min(320, availableWidth);
+        const width = Math.max(
+          minWidth,
+          Math.min(availableWidth, requestedWidth),
+        );
+        stage.style.width = `${width}px`;
+        stageResizer.setAttribute(
+          "aria-valuemax",
+          String(Math.round(availableWidth)),
+        );
+        stageResizer.setAttribute("aria-valuenow", String(Math.round(width)));
+        return width;
+      }
+      const savedStageWidth = Number(localStorage.getItem(stageWidthKey));
+      if (savedStageWidth > 0) setStageWidth(savedStageWidth);
+      let stageDragging = false;
+      stageResizer.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        stageDragging = true;
+        stage.classList.add("resizing");
+        stageResizer.setPointerCapture(event.pointerId);
+      });
+      stageResizer.addEventListener("pointermove", (event) => {
+        if (!stageDragging) return;
+        const bounds = stage.parentElement.getBoundingClientRect();
+        const center = bounds.left + bounds.width / 2;
+        setStageWidth((event.clientX - center) * 2);
+      });
+      const finishStageResize = () => {
+        if (!stageDragging) return;
+        stageDragging = false;
+        stage.classList.remove("resizing");
+        localStorage.setItem(
+          stageWidthKey,
+          String(Math.round(stage.getBoundingClientRect().width)),
+        );
+      };
+      stageResizer.addEventListener("pointerup", finishStageResize);
+      stageResizer.addEventListener("pointercancel", finishStageResize);
+      stageResizer.addEventListener("keydown", (event) => {
+        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+        event.preventDefault();
+        const step = event.shiftKey ? 80 : 32;
+        const direction = event.key === "ArrowRight" ? 1 : -1;
+        const width = setStageWidth(
+          stage.getBoundingClientRect().width + direction * step,
+        );
+        localStorage.setItem(stageWidthKey, String(Math.round(width)));
+      });
+      stageResizer.addEventListener("dblclick", () => {
+        localStorage.removeItem(stageWidthKey);
+        stage.style.width = "";
+        stageResizer.setAttribute(
+          "aria-valuenow",
+          String(Math.round(stage.parentElement.clientWidth)),
+        );
+      });
+      window.addEventListener("resize", () => {
+        if (stage.style.width) {
+          const width = setStageWidth(stage.getBoundingClientRect().width);
+          localStorage.setItem(stageWidthKey, String(Math.round(width)));
+        }
+      });
       let tracks = [],
         playlistIds = JSON.parse(
           localStorage.getItem("nocturne-playlist") || "[]",
@@ -1563,6 +1682,42 @@
         persistPlaylist();
         renderList();
       }
+      function randomNextIndex(queue, currentIndex) {
+        if (queue.length < 2) return currentIndex;
+        const index = Math.floor(Math.random() * (queue.length - 1));
+        return index >= currentIndex ? index + 1 : index;
+      }
+      function advancePlayback(automatic = false) {
+        const isYoutube = Boolean(currentYoutube);
+        const queue = isYoutube ? youtubeQueue : playbackQueue;
+        const currentIndex = isYoutube ? youtubeActive : active;
+        if (!queue.length || currentIndex < 0) return;
+
+        if (automatic && repeat) {
+          if (isYoutube) playYoutubeTrack(queue[currentIndex], queue);
+          else {
+            audio.currentTime = 0;
+            audio.play().catch(() => {});
+          }
+          return;
+        }
+        if (
+          automatic &&
+          (queue.length === 1 || (!shuffle && currentIndex >= queue.length - 1))
+        ) {
+          if (isYoutube) window.youtubePlayer?.stopVideo();
+          else audio.pause();
+          return;
+        }
+
+        const nextIndex = shuffle
+          ? randomNextIndex(queue, currentIndex)
+          : (currentIndex + 1) % queue.length;
+        if (isYoutube) playYoutubeTrack(queue[nextIndex], queue);
+        else playTrack(nextIndex, queue);
+      }
+      window.onYouTubeTrackEnded = () => advancePlayback(true);
+
       function playTrack(i, queue = tracks) {
         if (!queue.length) return;
         currentYoutube = null;
@@ -1723,28 +1878,20 @@
         else if (playbackQueue.length) playTrack(active - 1, playbackQueue);
       });
       document.querySelector("#next").addEventListener("click", () => {
-        if (currentYoutube && youtubeQueue.length) {
-          youtubeActive = shuffle
-            ? Math.floor(Math.random() * youtubeQueue.length)
-            : (youtubeActive + 1) % youtubeQueue.length;
-          playYoutubeTrack(youtubeQueue[youtubeActive], youtubeQueue);
-          return;
-        }
-        if (playbackQueue.length)
-          playTrack(
-            shuffle
-              ? Math.floor(Math.random() * playbackQueue.length)
-              : active + 1,
-            playbackQueue,
-          );
+        advancePlayback();
       });
       document.querySelector("#shuffle").addEventListener("click", (e) => {
         shuffle = !shuffle;
         e.currentTarget.classList.toggle("selected", shuffle);
-        if (shuffle && active < 0) {
-          const q = view === "playlist" ? playlistTracks() : tracks;
-          if (q.length) playTrack(Math.floor(Math.random() * q.length), q);
+        if (!shuffle || active >= 0 || currentYoutube) return;
+        if (view === "youtube" && youtubeResults.length) {
+          const index = Math.floor(Math.random() * youtubeResults.length);
+          playYoutubeTrack(youtubeResults[index], youtubeResults);
+          return;
         }
+        const queue = view === "playlist" ? playlistTracks() : tracks;
+        if (queue.length)
+          playTrack(Math.floor(Math.random() * queue.length), queue);
       });
       document.querySelector("#loop").addEventListener("click", (e) => {
         repeat = !repeat;
@@ -1784,15 +1931,7 @@
           document.querySelector("#duration").textContent = fmt(audio.duration);
         }
       });
-      audio.addEventListener("ended", () => {
-        if (!repeat && playbackQueue.length)
-          playTrack(
-            shuffle
-              ? Math.floor(Math.random() * playbackQueue.length)
-              : active + 1,
-            playbackQueue,
-          );
-      });
+      audio.addEventListener("ended", () => advancePlayback(true));
       audio.addEventListener(
         "play",
         () => (document.querySelector("#play").textContent = "Ⅱ"),
